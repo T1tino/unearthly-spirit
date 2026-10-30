@@ -67,6 +67,8 @@ Show a container with `Visible = varShowNoteDialog` and a label with `Text = var
 
 ## Installation / Usage
 
+GitHub Actions builds both `main` and `clipboard-write` on pushes and pull requests. You can also start a build from the **Actions** tab with **Run workflow**. Download the compiled control from that run's **Artifacts** section; artifacts are retained for 14 days.
+
 There are two ways to install the PCF component.
 1. Download the managed solution from the [releases](https://github.com/iamgreggarcia/IFrameVirtualPCF/releases/) page of this repo
 2. Clone and push the solution via the [MS Power Platform CLI](https://docs.microsoft.com/en-us/power-platform/developer/cli/introduction)
