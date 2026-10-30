@@ -1,5 +1,5 @@
 {
-  "name": "pcf-project",
+  "name": "pcf-clipboard-permission-test",
   "version": "1.0.3",
   "description": "Project containing your PowerApps Component Framework (PCF) control.",
   "scripts": {

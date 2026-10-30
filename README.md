@@ -1,5 +1,15 @@
 # iFrame PCF Code Component
 
+## Clipboard permission test variant
+
+This separate control variant preserves the original compiled PCF and adds an iframe `allow` attribute that delegates `clipboard-read` and `clipboard-write` to the exact origin configured in `src`. The control has a distinct namespace and constructor so it can be imported alongside the regular build.
+
+The permission is only a request/delegation. It cannot override a restrictive `Permissions-Policy` from the Power Apps host, browser policy, or clipboard user-activation requirements. Clipboard read may prompt or remain blocked; writing generally needs a user gesture such as pressing a button inside the page. CORS is unrelated to clipboard permissions, and making the iframe same-origin with Power Apps is neither needed nor a realistic option for GitHub Pages.
+
+Compare this version with the regular build under the same browser and Power Apps host. In `notes.js`, try `navigator.clipboard.writeText(text)` from the actual Copy button click and record `navigator.clipboard.readText()` separately; do not infer clipboard-read permission from a successful write. The page must be in a secure context (HTTPS).
+
+Build this variant from this directory with `npm ci && npm run refreshTypes && npm run build`. Its artifacts are isolated in this project's `out` directory.
+
 ![demo](/img/iFramePCF.gif)
 
 The **iFrameVirtualPCF** code component provides a wrapper around the `<iframe>` [HTML element](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe#positioning_and_scaling), providing a nested browsing context inside a Power Apps Canvas App or [Custom Page](https://learn.microsoft.com/en-us/power-apps/maker/model-driven-apps/add-page-to-model-app).

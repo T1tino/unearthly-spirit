@@ -8,8 +8,8 @@
   <Import Project="$(PowerAppsTargetsPath)\Microsoft.PowerApps.VisualStudio.Pcf.props" Condition="Exists('$(PowerAppsTargetsPath)\Microsoft.PowerApps.VisualStudio.Pcf.props')" />
 
   <PropertyGroup>
-    <Name>cand3</Name>
-    <ProjectGuid>cacbdd27-524a-43c1-933a-d422d8cf1d00</ProjectGuid>
+    <Name>cand3ClipboardTest</Name>
+    <ProjectGuid>7a4e1590-8d0b-4575-93b1-ef14d11b2321</ProjectGuid>
     <OutputPath>$(MSBuildThisFileDirectory)out\controls</OutputPath>
   </PropertyGroup>
 

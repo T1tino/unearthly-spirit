@@ -67,6 +67,7 @@ export const IFrameControl = React.memo((props: IFrameControlProps) => {
             width={width}
             height={height}
             title="Embedded webpage"
+            allow={`clipboard-read ${sourceOrigin}; clipboard-write ${sourceOrigin}`}
             onLoad={handleLoad}
           ></iframe>
         </Stack.Item>

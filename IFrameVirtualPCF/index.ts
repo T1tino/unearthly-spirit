@@ -3,7 +3,7 @@ import * as React from "react";
 import { IFrameControlProps } from "./components/Component.types";
 import { IFrameControl } from "./components/IFrameControl";
 
-export class IFrameVirtualPCF
+export class IFrameVirtualPCFClipboardTest
   implements ComponentFramework.ReactControl<IInputs, IOutputs>
 {
   private notifyOutputChanged: () => void;
