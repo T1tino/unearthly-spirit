@@ -5,6 +5,8 @@ on:
     branches:
       - main
       - clipboard-write
+    paths-ignore:
+      - builds/**
   pull_request:
     branches:
       - main
@@ -12,7 +14,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -25,9 +27,30 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - id: branch
+        run: |
+          branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          branch="${branch//\//-}"
+          echo "name=$branch" >> "$GITHUB_OUTPUT"
+      - name: Package PCF build
+        run: |
+          mkdir -p builds
+          zip -rq "builds/pcf-control-${{ steps.branch.outputs.name }}.zip" out/controls
       - uses: actions/upload-artifact@v4
         with:
-          name: pcf-control
-          path: out/controls/
+          name: pcf-control-${{ steps.branch.outputs.name }}
+          path: builds/pcf-control-${{ steps.branch.outputs.name }}.zip
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 90
+      - name: Keep build ZIP on its branch
+        if: github.event_name != 'pull_request'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "builds/pcf-control-${{ steps.branch.outputs.name }}.zip"
+          if git diff --cached --quiet; then
+            echo "Build ZIP is already up to date."
+            exit 0
+          fi
+          git commit -m "Update ${GITHUB_REF_NAME} build ZIP"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
