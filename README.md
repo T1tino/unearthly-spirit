@@ -77,7 +77,7 @@ Show a container with `Visible = varShowNoteDialog` and a label with `Text = var
 
 ## Installation / Usage
 
-GitHub Actions builds both `main` and `clipboard-write` on pushes and pull requests. You can also start a build from the **Actions** tab with **Run workflow**. Download the compiled control from that run's **Artifacts** section; artifacts are retained for 14 days.
+GitHub Actions builds both `main` and `clipboard-write` on pushes and pull requests. You can also start a build from the **Actions** tab with **Run workflow**. Each branch's latest ZIP is committed at `builds/pcf-control-<branch>.zip` and attached to its workflow run for up to 90 days. Pull-request runs attach a ZIP to the run but do not commit it to a branch.
 
 There are two ways to install the PCF component.
 1. Download the managed solution from the [releases](https://github.com/iamgreggarcia/IFrameVirtualPCF/releases/) page of this repo
