@@ -1,14 +1,18 @@
 # iFrame PCF Code Component
 
-## Clipboard permission test variant
+## Receive text and confirm copying
 
-This separate control variant preserves the original compiled PCF and adds an iframe `allow` attribute that delegates `clipboard-read` and `clipboard-write` to the exact origin configured in `src`. The control has a distinct namespace and constructor so it can be imported alongside the regular build.
+When the embedded page sends text to the PCF, the control displays a confirmation dialog with the received text. The user must press **Copy text** to write it to the clipboard; **Cancel** dismisses the dialog. Clipboard failures are shown in the dialog.
 
-The permission is only a request/delegation. It cannot override a restrictive `Permissions-Policy` from the Power Apps host, browser policy, or clipboard user-activation requirements. Clipboard read may prompt or remain blocked; writing generally needs a user gesture such as pressing a button inside the page. CORS is unrelated to clipboard permissions, and making the iframe same-origin with Power Apps is neither needed nor a realistic option for GitHub Pages.
-
-Compare this version with the regular build under the same browser and Power Apps host. In `notes.js`, try `navigator.clipboard.writeText(text)` from the actual Copy button click and record `navigator.clipboard.readText()` separately; do not infer clipboard-read permission from a successful write. The page must be in a secure context (HTTPS).
+Clipboard access is performed by the PCF host in response to the user's button click, not by the embedded page. It requires a secure context and can still be restricted by the browser or Power Apps host. CORS is unrelated to clipboard permissions.
 
 Build this variant from this directory with `npm ci && npm run refreshTypes && npm run build`. Its artifacts are isolated in this project's `out` directory.
+
+## Build an importable solution from GitHub Actions
+
+Open the repository's **Actions** tab, choose **Build PCF solution**, select **Run workflow**, and download the artifact named `<repository>-<run number>`. It contains an unmanaged Power Platform solution ZIP that can be imported into an environment. The workflow builds the PCF, packages it with the Power Platform CLI, and does not deploy it.
+
+The workflow keeps the component's manifest and security settings as committed; it does not offer runtime permission overrides. The `src` URL remains configurable on the component in Power Apps.
 
 ![demo](/img/iFramePCF.gif)
 
@@ -62,18 +66,7 @@ function sendNoteToPowerApps(text) {
 
 Replace the existing wildcard `postMessage` call in `copyResult()` with `sendNoteToPowerApps(resultText)`. The iframe must be reloaded after the PCF sends its handshake.
 
-To display a confirmation outside the iframe in a Canvas App, add a repeating Timer (for example, `Duration = 250`, `Repeat = true`, `AutoStart = true`, `Visible = false`) and initialize `varLastNoteId` to `0`. Set the Timer's `OnTimerEnd` to:
-
-```powerfx
-If(
-    IFrameVirtualPCF1.noteId <> varLastNoteId,
-    Set(varLastNoteId, IFrameVirtualPCF1.noteId);
-    Set(varPendingNote, IFrameVirtualPCF1.noteText);
-    Set(varShowNoteDialog, true)
-)
-```
-
-Show a container with `Visible = varShowNoteDialog` and a label with `Text = varPendingNote`. Its **Copy** button can use `OnSelect = Copy(varPendingNote); Set(varShowNoteDialog, false)`, and its **Cancel** button can use `OnSelect = Set(varShowNoteDialog, false)`. The copy is initiated by the user's button click, not by the iframe message.
+The PCF displays its own confirmation dialog when it receives a valid note. It also exposes `noteText` and `noteId` outputs if the Canvas App needs to react to received notes separately.
 
 ## Installation / Usage
 

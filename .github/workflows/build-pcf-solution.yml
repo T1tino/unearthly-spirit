@@ -1,0 +1,67 @@
+name: Build PCF solution
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: IFrameVirtualPCFClipboardTest/package-lock.json
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build PCF control
+        working-directory: IFrameVirtualPCFClipboardTest
+        run: |
+          npm ci
+          npm run refreshTypes
+          npm run build
+
+      - name: Install Power Platform CLI
+        run: dotnet tool install --global Microsoft.PowerApps.CLI.Tool
+
+      - name: Add Power Platform CLI to PATH
+        run: echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+
+      - name: Create solution project
+        run: |
+          pac solution init \
+            --publisher-name T1tino \
+            --publisher-prefix titino \
+            --outputDirectory solution
+          cd solution
+          pac solution add-reference \
+            --path ../IFrameVirtualPCFClipboardTest/cand3ClipboardTest.pcfproj
+
+      - name: Build and package unmanaged solution
+        env:
+          REPOSITORY_NAME: ${{ github.event.repository.name }}
+        run: |
+          dotnet build solution/*.cdsproj --configuration Release
+          mkdir -p artifacts
+          pac solution pack \
+            --zipfile "$GITHUB_WORKSPACE/artifacts/${REPOSITORY_NAME}-${GITHUB_RUN_NUMBER}.zip" \
+            --folder "$GITHUB_WORKSPACE/solution" \
+            --packagetype Unmanaged
+
+      - name: Upload solution ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.repository.name }}-${{ github.run_number }}
+          path: artifacts/${{ github.event.repository.name }}-${{ github.run_number }}.zip
+          if-no-files-found: error

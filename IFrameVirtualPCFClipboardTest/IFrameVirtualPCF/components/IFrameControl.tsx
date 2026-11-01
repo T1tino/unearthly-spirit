@@ -1,4 +1,15 @@
-import { DefaultButton, Stack, ThemeProvider } from "@fluentui/react";
+import {
+  DefaultButton,
+  Dialog,
+  DialogFooter,
+  DialogType,
+  MessageBar,
+  MessageBarType,
+  PrimaryButton,
+  Stack,
+  TextField,
+  ThemeProvider,
+} from "@fluentui/react";
 import * as React from "react";
 import { IFrameControlProps } from "./Component.types";
 const defaultSrc = "https://cesargarcia-cdcr.github.io/leaflet-Maps/";
@@ -6,6 +17,8 @@ const defaultSrc = "https://cesargarcia-cdcr.github.io/leaflet-Maps/";
 export const IFrameControl = React.memo((props: IFrameControlProps) => {
   const { width, height, onFullScreen, isFullScreen, showFullScreenBtn } =
     props;
+  const [pendingText, setPendingText] = React.useState<string>();
+  const [clipboardError, setClipboardError] = React.useState<string>();
 
   const src = props.src ?? defaultSrc;
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
@@ -32,6 +45,8 @@ export const IFrameControl = React.memo((props: IFrameControlProps) => {
       const text = getNoteText(event.data);
 
       if (text !== undefined) {
+        setPendingText(text);
+        setClipboardError(undefined);
         props.onNoteReceived(text);
       }
     };
@@ -54,6 +69,26 @@ export const IFrameControl = React.memo((props: IFrameControlProps) => {
     };
   }, [width, height]);
 
+  const copyReceivedText = async (): Promise<void> => {
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error("Clipboard access is unavailable in this browser.");
+      }
+
+      await navigator.clipboard.writeText(pendingText ?? "");
+      setPendingText(undefined);
+    } catch (error) {
+      setClipboardError(
+        error instanceof Error ? error.message : "Unable to copy the text."
+      );
+    }
+  };
+
+  const dismissCopyDialog = (): void => {
+    setPendingText(undefined);
+    setClipboardError(undefined);
+  };
+
   return (
     <ThemeProvider style={containerSize}>
       <Stack verticalFill grow style={rootContainerStyle}>
@@ -67,7 +102,6 @@ export const IFrameControl = React.memo((props: IFrameControlProps) => {
             width={width}
             height={height}
             title="Embedded webpage"
-            allow={`clipboard-read ${sourceOrigin}; clipboard-write ${sourceOrigin}`}
             onLoad={handleLoad}
           ></iframe>
         </Stack.Item>
@@ -81,6 +115,32 @@ export const IFrameControl = React.memo((props: IFrameControlProps) => {
           </Stack.Item>
         )}
       </Stack>
+      <Dialog
+        hidden={pendingText === undefined}
+        onDismiss={dismissCopyDialog}
+        dialogContentProps={{
+          type: DialogType.normal,
+          title: "Copy received text?",
+        }}
+        modalProps={{ isBlocking: true }}
+      >
+        <TextField
+          label="Text received from the embedded page"
+          value={pendingText ?? ""}
+          readOnly
+          multiline
+          autoAdjustHeight
+        />
+        {clipboardError && (
+          <MessageBar messageBarType={MessageBarType.error}>
+            {clipboardError}
+          </MessageBar>
+        )}
+        <DialogFooter>
+          <PrimaryButton onClick={copyReceivedText} text="Copy text" />
+          <DefaultButton onClick={dismissCopyDialog} text="Cancel" />
+        </DialogFooter>
+      </Dialog>
     </ThemeProvider>
   );
 });
