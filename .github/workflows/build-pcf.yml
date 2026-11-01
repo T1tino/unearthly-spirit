@@ -1,56 +1,158 @@
-name: Build PCF
+name: Build PCF permission test
+run-name: "PCF clipboard permission test (read=${{ inputs.clipboard_read }}, write=${{ inputs.clipboard_write }}, origin=${{ inputs.permission_origin }})"
 
 on:
-  push:
-    branches:
-      - main
-      - clipboard-write
-    paths-ignore:
-      - builds/**
-  pull_request:
-    branches:
-      - main
-      - clipboard-write
   workflow_dispatch:
+    inputs:
+      solution_package_type:
+        description: "Unmanaged is editable after import; managed is intended for distribution."
+        required: true
+        type: choice
+        options:
+          - Unmanaged
+          - Managed
+        default: Unmanaged
+      clipboard_read:
+        description: "UNSAFE TEST: delegate clipboard-read to the selected origin. Defaults to disabled."
+        required: true
+        type: boolean
+        default: false
+      clipboard_write:
+        description: "UNSAFE TEST: delegate clipboard-write to the selected origin. Defaults to disabled."
+        required: true
+        type: boolean
+        default: false
+      permission_origin:
+        description: "UNSAFE TEST: choose the iframe's own origin or a different exact HTTPS origin. No wildcard origins."
+        required: true
+        type: choice
+        options:
+          - iframe
+          - custom
+        default: iframe
+      custom_permission_origin:
+        description: "For custom mode, enter an exact HTTPS origin (for example https://example.com), not a URL path."
+        required: false
+        type: string
+        default: ""
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-      - run: npm ci
-      - run: npm run build
-      - id: branch
-        run: |
-          branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
-          branch="${branch//\//-}"
-          echo "name=$branch" >> "$GITHUB_OUTPUT"
-      - name: Package PCF build
-        run: |
-          mkdir -p builds
-          zip -rq "builds/pcf-control-${{ steps.branch.outputs.name }}.zip" out/controls
-      - uses: actions/upload-artifact@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
         with:
-          name: pcf-control-${{ steps.branch.outputs.name }}
-          path: builds/pcf-control-${{ steps.branch.outputs.name }}.zip
-          if-no-files-found: error
-          retention-days: 90
-      - name: Keep build ZIP on its branch
-        if: github.event_name != 'pull_request'
+          dotnet-version: 10.0.x
+
+      - name: Configure temporary clipboard permissions
+        env:
+          CLIPBOARD_READ: ${{ inputs.clipboard_read }}
+          CLIPBOARD_WRITE: ${{ inputs.clipboard_write }}
+          PERMISSION_ORIGIN_MODE: ${{ inputs.permission_origin }}
+          CUSTOM_PERMISSION_ORIGIN: ${{ inputs.custom_permission_origin }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "builds/pcf-control-${{ steps.branch.outputs.name }}.zip"
-          if git diff --cached --quiet; then
-            echo "Build ZIP is already up to date."
-            exit 0
-          fi
-          git commit -m "Update ${GITHUB_REF_NAME} build ZIP"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          node <<'NODE'
+          const fs = require("node:fs");
+          const path = require("node:path");
+
+          const read = process.env.CLIPBOARD_READ === "true";
+          const write = process.env.CLIPBOARD_WRITE === "true";
+          const mode = process.env.PERMISSION_ORIGIN_MODE;
+          let permissionOrigin = "iframe";
+
+          if (mode === "custom") {
+            const value = process.env.CUSTOM_PERMISSION_ORIGIN.trim();
+            let parsed;
+            try {
+              parsed = new URL(value);
+            } catch {
+              throw new Error("Custom permission origin must be an exact HTTPS origin.");
+            }
+
+            if (
+              parsed.protocol !== "https:" ||
+              parsed.username ||
+              parsed.password ||
+              parsed.pathname !== "/" ||
+              parsed.search ||
+              parsed.hash ||
+              (value !== parsed.origin && value !== `${parsed.origin}/`)
+            ) {
+              throw new Error("Custom permission origin must be an exact HTTPS origin without a path, query, or fragment.");
+            }
+            permissionOrigin = parsed.origin;
+          } else if (mode !== "iframe") {
+            throw new Error("Choose either iframe or custom permission origin mode.");
+          }
+
+          const config = {
+            clipboardRead: read,
+            clipboardWrite: write,
+            permissionOrigin,
+          };
+          const content =
+            `export interface ClipboardPermissionConfig {\n` +
+            `  clipboardRead: boolean;\n` +
+            `  clipboardWrite: boolean;\n` +
+            `  permissionOrigin: string;\n` +
+            `}\n\n` +
+            `export const clipboardPermissionConfig: ClipboardPermissionConfig = ${JSON.stringify(config, null, 2)};\n`;
+          fs.writeFileSync(
+            path.join("IFrameVirtualPCF", "components", "ClipboardPermissionConfig.ts"),
+            content
+          );
+          NODE
+
+      - name: Build PCF control
+        run: |
+          npm ci
+          npm run refreshTypes
+          npm run build
+
+      - name: Install Power Platform CLI
+        run: dotnet tool install --global Microsoft.PowerApps.CLI.Tool
+
+      - name: Add Power Platform CLI to PATH
+        run: echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+
+      - name: Create solution project
+        run: |
+          pac solution init \
+            --publisher-name T1tino \
+            --publisher-prefix titino \
+            --outputDirectory solution
+          cd solution
+          pac solution add-reference --path ../cand3.pcfproj
+
+      - name: Build and package solution
+        env:
+          REPOSITORY_NAME: ${{ github.event.repository.name }}
+          SOLUTION_PACKAGE_TYPE: ${{ inputs.solution_package_type }}
+        run: |
+          dotnet build solution/*.cdsproj --configuration Release
+          mkdir -p artifacts
+          pac solution pack \
+            --zipfile "$GITHUB_WORKSPACE/artifacts/${REPOSITORY_NAME}-${GITHUB_RUN_NUMBER}-${SOLUTION_PACKAGE_TYPE}.zip" \
+            --folder "$GITHUB_WORKSPACE/solution" \
+            --packagetype "$SOLUTION_PACKAGE_TYPE"
+
+      - name: Upload solution ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.repository.name }}-${{ github.run_number }}-${{ inputs.solution_package_type }}-read-${{ inputs.clipboard_read }}-write-${{ inputs.clipboard_write }}-${{ inputs.permission_origin }}
+          path: artifacts/${{ github.event.repository.name }}-${{ github.run_number }}-${{ inputs.solution_package_type }}.zip
+          if-no-files-found: error
+          retention-days: 1

@@ -1,6 +1,7 @@
 import { DefaultButton, Stack, ThemeProvider } from "@fluentui/react";
 import * as React from "react";
 import { IFrameControlProps } from "./Component.types";
+import { clipboardPermissionConfig } from "./ClipboardPermissionConfig";
 const defaultSrc = "https://cesargarcia-cdcr.github.io/leaflet-Maps/";
 
 export const IFrameControl = React.memo((props: IFrameControlProps) => {
@@ -10,6 +11,18 @@ export const IFrameControl = React.memo((props: IFrameControlProps) => {
   const src = props.src ?? defaultSrc;
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
   const sourceOrigin = React.useMemo(() => new URL(src).origin, [src]);
+  const permissionOrigin =
+    clipboardPermissionConfig.permissionOrigin === "iframe"
+      ? sourceOrigin
+      : clipboardPermissionConfig.permissionOrigin;
+  const iframeAllow = [
+    clipboardPermissionConfig.clipboardRead &&
+      `clipboard-read ${permissionOrigin}`,
+    clipboardPermissionConfig.clipboardWrite &&
+      `clipboard-write ${permissionOrigin}`,
+  ]
+    .filter(Boolean)
+    .join("; ");
 
   const handleLoad = React.useCallback((): void => {
     iframeRef.current?.contentWindow?.postMessage(
@@ -67,6 +80,7 @@ export const IFrameControl = React.memo((props: IFrameControlProps) => {
             width={width}
             height={height}
             title="Embedded webpage"
+            allow={iframeAllow || undefined}
             onLoad={handleLoad}
           ></iframe>
         </Stack.Item>

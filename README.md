@@ -65,9 +65,17 @@ If(
 
 Show a container with `Visible = varShowNoteDialog` and a label with `Text = varPendingNote`. Its **Copy** button can use `OnSelect = Copy(varPendingNote); Set(varShowNoteDialog, false)`, and its **Cancel** button can use `OnSelect = Set(varShowNoteDialog, false)`. The copy is initiated by the user's button click, not by the iframe message.
 
-## Installation / Usage
+## Build a temporary permission-test solution
 
-GitHub Actions builds both `main` and `clipboard-write` on pushes and pull requests. You can also start a build from the **Actions** tab with **Run workflow**. Each branch's latest ZIP is committed at `builds/pcf-control-<branch>.zip` and attached to its workflow run for up to 90 days. Pull-request runs attach a ZIP to the run but do not commit it to a branch.
+This branch's workflow is manual-only. In GitHub, open **Actions** → **Build PCF permission test** → **Run workflow**.
+
+The defaults are safe: both clipboard permissions are disabled, and the permission origin is set to the iframe's own origin. To test delegation, enable `clipboard-read` and/or `clipboard-write`. Choose `iframe` to target the origin in the component's `src`, or `custom` to enter a different exact HTTPS origin. Origins are compared by scheme, host, and port; wildcard origins and URL paths are not accepted. The custom origin is the policy target, not a replacement for the component's `src`.
+
+**Security advisory:** enabling either permission is an intentionally unsafe test configuration. It only requests delegation to the selected iframe origin; browser policy, Power Apps policy, secure-context requirements, and user-activation requirements can still deny clipboard access. Test only in an environment you control. The workflow inputs are applied to the build runner and are not committed back to the repository; the resulting artifact contains the selected configuration and expires after 24 hours.
+
+Choose **Unmanaged** (default) for an editable development solution or **Managed** for distribution. The workflow builds an importable solution ZIP and uploads it as an artifact; it does not deploy the solution or commit generated files.
+
+## Installation / Usage
 
 There are two ways to install the PCF component.
 1. Download the managed solution from the [releases](https://github.com/iamgreggarcia/IFrameVirtualPCF/releases/) page of this repo
