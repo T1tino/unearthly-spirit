@@ -122,6 +122,21 @@ jobs:
           npm run refreshTypes
           npm run build
 
+      - name: Package PCF control ZIP
+        env:
+          REPOSITORY_NAME: ${{ github.event.repository.name }}
+        run: |
+          mkdir -p artifacts
+          zip -rq "$GITHUB_WORKSPACE/artifacts/${REPOSITORY_NAME}-${GITHUB_RUN_NUMBER}-pcf-control.zip" out/controls
+
+      - name: Upload PCF control ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.repository.name }}-${{ github.run_number }}-pcf-control
+          path: artifacts/${{ github.event.repository.name }}-${{ github.run_number }}-pcf-control.zip
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Install Power Platform CLI
         run: dotnet tool install --global Microsoft.PowerApps.CLI.Tool
 
@@ -155,4 +170,4 @@ jobs:
           name: ${{ github.event.repository.name }}-${{ github.run_number }}-${{ inputs.solution_package_type }}-read-${{ inputs.clipboard_read }}-write-${{ inputs.clipboard_write }}-${{ inputs.permission_origin }}
           path: artifacts/${{ github.event.repository.name }}-${{ github.run_number }}-${{ inputs.solution_package_type }}.zip
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 90
