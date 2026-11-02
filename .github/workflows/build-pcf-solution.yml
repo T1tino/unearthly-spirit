@@ -2,6 +2,25 @@ name: Build PCF solution
 
 on:
   workflow_dispatch:
+    inputs:
+      clipboard_read:
+        description: "Allow the iframe to read from the clipboard"
+        required: true
+        type: boolean
+        default: true
+      clipboard_write:
+        description: "Allow the iframe to write to the clipboard"
+        required: true
+        type: boolean
+        default: false
+      permission_origin:
+        description: "Origin to scope the iframe clipboard permissions to"
+        required: false
+        type: choice
+        default: iframe
+        options:
+          - iframe
+          - https://cesargarcia-cdcr.github.io
 
 permissions:
   contents: read
@@ -18,50 +37,31 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: IFrameVirtualPCFClipboardTest/package-lock.json
 
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate iframe permission config
+        env:
+          PCF_CLIPBOARD_READ: ${{ inputs.clipboard_read }}
+          PCF_CLIPBOARD_WRITE: ${{ inputs.clipboard_write }}
+          PCF_PERMISSION_ORIGIN: ${{ inputs.permission_origin }}
+        run: node scripts/write-permission-config.mjs
+
+      - name: Refresh PCF types
+        run: npm run refreshTypes
 
       - name: Build PCF control
-        working-directory: IFrameVirtualPCFClipboardTest
+        run: npm run build
+
+      - name: Package build artifact
         run: |
-          npm ci
-          npm run refreshTypes
-          npm run build
-
-      - name: Install Power Platform CLI
-        run: dotnet tool install --global Microsoft.PowerApps.CLI.Tool
-
-      - name: Add Power Platform CLI to PATH
-        run: echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
-
-      - name: Create solution project
-        run: |
-          pac solution init \
-            --publisher-name T1tino \
-            --publisher-prefix titino \
-            --outputDirectory solution
-          cd solution
-          pac solution add-reference \
-            --path ../IFrameVirtualPCFClipboardTest/cand3ClipboardTest.pcfproj
-
-      - name: Build and package unmanaged solution
-        env:
-          REPOSITORY_NAME: ${{ github.event.repository.name }}
-        run: |
-          dotnet build solution/*.cdsproj --configuration Release
           mkdir -p artifacts
-          pac solution pack \
-            --zipfile "$GITHUB_WORKSPACE/artifacts/${REPOSITORY_NAME}-${GITHUB_RUN_NUMBER}.zip" \
-            --folder "$GITHUB_WORKSPACE/solution" \
-            --packagetype Unmanaged
+          zip -rq "artifacts/pcf-clipboard-${{ inputs.clipboard_read }}-${{ inputs.clipboard_write }}.zip" out/controls
 
-      - name: Upload solution ZIP
+      - name: Upload PCF ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ github.event.repository.name }}-${{ github.run_number }}
-          path: artifacts/${{ github.event.repository.name }}-${{ github.run_number }}.zip
+          name: pcf-clipboard-${{ inputs.clipboard_read }}-${{ inputs.clipboard_write }}
+          path: artifacts/pcf-clipboard-${{ inputs.clipboard_read }}-${{ inputs.clipboard_write }}.zip
           if-no-files-found: error
